@@ -26,6 +26,20 @@ No GPU is required to run the demo.
 
 ![Comparison: degraded vs bicubic vs ours vs ground truth](assets/comparison.png)
 
+### Sample outputs and full metric tables
+
+[`results/`](results/) contains viewable sample outputs and the complete
+per-image scores:
+
+- `results/samples/` — 6 test images at four stages each
+  (`_1_degraded`, `_2_bicubic`, `_3_restored`, `_4_groundtruth`), chosen to
+  span best, typical and hardest cases rather than only the flattering ones
+- `results/sample_scores.csv` — per-sample PSNR/SSIM/LPIPS, ours vs bicubic
+- `results/metrics_ours_100images.csv` and `results/metrics_bicubic_100images.csv`
+  — every score behind the table above
+
+Best sample: `002859` improves from 24.27 dB (bicubic) to **37.12 dB**.
+
 ## How it works
 
 ```
@@ -94,6 +108,8 @@ Every file is written for readability: small modules, beginner-friendly
 naming, and comments that explain **why**, not just what.
 
 ## Installation
+
+Clone into a folder **outside** an existing copy of this project:
 
 ```bash
 git clone https://github.com/prakharbajaj1551/semicon-image-restoration.git

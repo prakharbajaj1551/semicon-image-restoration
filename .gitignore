@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 .venv/
 
-# Data and generated outputs (too large for git; see README for setup)
+# Data and generated outputs (too large for git; see README for setup).
+# Note: results/ IS committed — it holds viewable sample outputs and the
+# per-image metric tables that the submission requires.
 data/
 outputs/
 runs/
