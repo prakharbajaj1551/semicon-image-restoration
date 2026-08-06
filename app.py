@@ -109,9 +109,28 @@ if mode == "Restore a degraded image":
         "Optional: upload the clean ground truth (enables PSNR)",
         type=UPLOAD_TYPES)
 
+    # The input/ground-truth pair can come from an upload OR from the
+    # built-in sample picker below — both feed the same display code.
+    degraded = truth = None
     if uploaded is not None:
         degraded = load_uploaded(uploaded)
+        if reference is not None:
+            truth = load_uploaded(reference)
+    elif Path("data/test/lq").exists():
+        # One-click demo: judges shouldn't watch us dig through folders.
+        # Lists held-out test files; the matching ground truth is loaded
+        # automatically so PSNR appears without a second upload.
+        from utils.image_io import list_images, load_image
+        sample_names = [p.name for p in list_images("data/test/lq")[:20]]
+        choice = st.selectbox("…or pick a sample from the held-out test set",
+                              ["(choose a sample)"] + sample_names)
+        if choice != "(choose a sample)":
+            degraded = load_image(Path("data/test/lq") / choice)
+            gt_path = Path("data/test/gt") / choice
+            if gt_path.exists():
+                truth = load_image(gt_path)
 
+    if degraded is not None:
         start = time.time()
         restored = restore_image(model, degraded, scale, device,
                                  tile=256, overlap=32)
@@ -130,8 +149,7 @@ if mode == "Restore a degraded image":
         metric_cols = st.columns(3)
         metric_cols[0].metric("Inference time", f"{seconds:.2f} s")
         metric_cols[1].metric("Upscaling", f"x{scale}")
-        if reference is not None:
-            truth = load_uploaded(reference)
+        if truth is not None:
             if truth.shape == restored.shape:
                 metric_cols[2].metric("PSNR vs ground truth",
                                       f"{psnr(restored, truth):.2f} dB")
