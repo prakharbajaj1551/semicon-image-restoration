@@ -96,6 +96,8 @@ naming, and comments that explain **why**, not just what.
 ## Installation
 
 ```bash
+git clone https://github.com/prakharbajaj1551/semicon-image-restoration.git
+cd semicon-image-restoration
 python -m venv .venv
 .venv/Scripts/activate        # Windows   (Linux/Mac: source .venv/bin/activate)
 pip install -r requirements.txt

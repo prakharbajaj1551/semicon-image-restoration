@@ -96,7 +96,7 @@ Comparison figure: degraded → bicubic → ours → ground truth
 > demo — happy to show it."
 
 ## Slide 8 — GitHub
-Repo: github.com/<add-link-here>  *(fill in once repo is created)*
+Repo: github.com/prakharbajaj1551/semicon-image-restoration
 - Modular: dataset/ · models/ · utils/ · train / evaluate / inference / app
 - Every file commented with WHY, beginner-readable
 - README: results, commands, and metric explanations
