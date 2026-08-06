@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Data and generated outputs (too large for git; see README for setup)
+data/
+outputs/
+runs/
+*.zip
+
+# Local/internal working files
+legacy/
+TEAM_CHECKLIST.md
+.claude/
+
+# Keep the trained model (small, 6.8 MB) — checkpoints/best.pth is committed.
+# Only ignore the rolling crash-recovery checkpoint:
+checkpoints/last.pth

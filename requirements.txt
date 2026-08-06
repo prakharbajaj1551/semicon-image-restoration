@@ -1,0 +1,9 @@
+torch>=2.3
+torchvision>=0.18
+numpy
+pillow
+scikit-image>=0.19
+lpips
+pytorch-msssim
+streamlit
+tqdm
