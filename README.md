@@ -119,6 +119,25 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Quick start — verify it works without the dataset
+
+The hackathon dataset is not redistributed here. To confirm the code and
+the trained model run end to end, generate a synthetic demo set:
+
+```bash
+python make_demo_data.py
+python inference.py --ckpt checkpoints/best.pth --input demo_data/lq --output outputs/demo
+python evaluate.py --restored outputs/demo --gt demo_data/gt
+```
+
+⚠️ Those demo images are deliberately synthetic (hard geometric edges,
+unlike the training distribution), so they score **~6 dB below** our real
+benchmark. They prove the pipeline runs — they are **not** a benchmark.
+The 28.00 dB figure above comes from the organisers' real held-out pairs.
+
+You can also try the UI on any image of your own: `streamlit run app.py`
+→ "Demo: degrade a clean image, then restore".
+
 ## Dataset setup
 
 The organisers provide float32 `.npy` files: `NoisyLR` (128×128 degraded)
