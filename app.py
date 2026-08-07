@@ -62,9 +62,37 @@ def get_model():
     return model, config, device
 
 
-def to_display(tensor):
-    """(1,H,W) tensor in [0,1] -> 2D array Streamlit can show as an image."""
-    return tensor.squeeze(0).clamp(0, 1).numpy()
+def to_display(tensor, match_size=None):
+    """(1,H,W) tensor in [0,1] -> 2D array Streamlit can show as an image.
+
+    WHY match_size matters (this is not cosmetic):
+        Streamlit stretches every image to the column width. A 128x128
+        degraded image stretched to ~600 px gets SMOOTHED by the browser,
+        which hides its noise — the input then looks almost as clean as
+        the restoration and the model appears to do nothing.
+        Passing match_size repeats each pixel (nearest neighbour) so the
+        small image keeps its real, blocky, noisy pixels. Now the
+        comparison shows what the model actually removed.
+    """
+    array = tensor.squeeze(0).clamp(0, 1).numpy()
+    if match_size is not None and array.shape[0] != match_size:
+        factor = match_size // array.shape[0]
+        array = np.repeat(np.repeat(array, factor, axis=0), factor, axis=1)
+    return array
+
+
+def zoom_crop(tensor, match_size=None, fraction=4):
+    """Center crop covering 1/`fraction` of the image, for a detail view.
+
+    WHY: on a full 256x256 view shown small on screen, fine differences are
+    hard to see. Zooming into the middle makes noise and edge sharpness
+    obvious — this is what convinces a judge.
+    """
+    array = to_display(tensor, match_size)
+    h, w = array.shape
+    ch, cw = h // fraction, w // fraction
+    top, left = (h - ch) // 2, (w - cw) // 2
+    return array[top:top + ch, left:left + cw]
 
 
 def to_png_bytes(tensor):
@@ -136,23 +164,48 @@ if mode == "Restore a degraded image":
                                  tile=256, overlap=32)
         seconds = time.time() - start
 
-        left, right = st.columns(2)
+        # The bicubic baseline: what you get with NO AI, for a fair 3-way view.
+        baseline = F.interpolate(degraded.unsqueeze(0), scale_factor=scale,
+                                 mode="bicubic", align_corners=False)
+        baseline = baseline.squeeze(0).clamp(0, 1)
+
+        big = restored.shape[-1]   # display every panel at this pixel size
+        left, middle, right = st.columns(3)
         with left:
-            st.subheader("Original (degraded)")
-            st.image(to_display(degraded), use_container_width=True)
-            st.caption(f"{degraded.shape[-1]} x {degraded.shape[-2]} px")
+            st.subheader("Degraded input")
+            st.image(to_display(degraded, big), use_container_width=True)
+            st.caption(f"{degraded.shape[-1]} x {degraded.shape[-2]} px "
+                       f"(shown {scale}x, real pixels)")
+        with middle:
+            st.subheader(f"Bicubic x{scale} (no AI)")
+            st.image(to_display(baseline), use_container_width=True)
+            st.caption("plain upscaling — noise is still there")
         with right:
-            st.subheader("Restored")
+            st.subheader("Restored (our model)")
             st.image(to_display(restored), use_container_width=True)
             st.caption(f"{restored.shape[-1]} x {restored.shape[-2]} px")
+
+        if st.checkbox("Zoom into the centre detail", value=True):
+            zoom_cols = st.columns(3)
+            zoom_cols[0].image(zoom_crop(degraded, big), use_container_width=True,
+                               caption="degraded (zoom)")
+            zoom_cols[1].image(zoom_crop(baseline), use_container_width=True,
+                               caption="bicubic (zoom)")
+            zoom_cols[2].image(zoom_crop(restored), use_container_width=True,
+                               caption="ours (zoom)")
 
         metric_cols = st.columns(3)
         metric_cols[0].metric("Inference time", f"{seconds:.2f} s")
         metric_cols[1].metric("Upscaling", f"x{scale}")
         if truth is not None:
             if truth.shape == restored.shape:
+                # Show ours AND the baseline so the gain is explicit.
+                ours_psnr = psnr(restored, truth)
+                base_psnr = psnr(baseline, truth)
                 metric_cols[2].metric("PSNR vs ground truth",
-                                      f"{psnr(restored, truth):.2f} dB")
+                                      f"{ours_psnr:.2f} dB",
+                                      delta=f"{ours_psnr - base_psnr:+.2f} dB "
+                                            f"vs bicubic ({base_psnr:.2f})")
             else:
                 st.warning("Ground truth size doesn't match the restored "
                            "image, so PSNR can't be computed.")
