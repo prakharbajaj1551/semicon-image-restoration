@@ -73,13 +73,14 @@ Tail conv → **add bicubic upscale of input** → Output 256×256
 | Bicubic (no AI) | 22.96 dB | 0.537 | 0.433 |
 | **Ours** | **28.00 dB** | **0.759** | **0.175** |
 
-Callouts: **+5.0 dB** · **+0.22 SSIM** · **−60 % LPIPS** · **1.2 s/image (CPU)**
+Callouts: **+5.0 dB** · **+0.22 SSIM** · **−60 % LPIPS** · **25 ms/image (T4 GPU)**
 Comparison figure: degraded → bicubic → ours → ground truth
 
 > Say: "On one hundred held-out pairs: plus five dB PSNR — that's roughly
 > 69 percent of pixel error eliminated — SSIM up from 0.54 to 0.76, and
 > LPIPS, the perceptual metric, cut by 60 percent. Better on every judged
-> axis. And it runs at about a second per image on a plain laptop CPU —
+> axis. And end to end — disk read, transfers, model, saving — it runs at
+> 25 milliseconds per image on a T4 GPU, about 40 images a second —
 > 30 milliseconds on a GPU."
 
 ## Slide 7 — Technology

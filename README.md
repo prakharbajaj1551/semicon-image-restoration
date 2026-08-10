@@ -21,8 +21,17 @@ Measured on 100 held-out image pairs never seen during training:
 **+5.0 dB PSNR** (≈ 69 % of pixel error removed), **+0.22 SSIM**, and
 **LPIPS reduced by 60 %** — better on every judged metric.
 
-Inference speed: **~1.2 s/image on a laptop CPU**, ~0.03 s/image on a T4 GPU.
-No GPU is required to run the demo.
+### Speed (end-to-end, measured)
+
+| Hardware | Per image | Throughput | 400 test images |
+|---|---|---|---|
+| NVIDIA T4 (batch 32) | **25.0 ms** | 40.0 img/s | ~10 s |
+| Laptop CPU (batch 1) | 1335 ms | 0.75 img/s | ~9 min |
+
+End-to-end means disk read, preprocessing, host↔device transfers, model
+execution, clipping and saving — the full pipeline, not just the forward
+pass. Method, hardware and software versions: [`results/runtime_report.md`](results/runtime_report.md),
+reproducible with `python benchmark.py`. No GPU is required to run the demo.
 
 ![Comparison: degraded vs bicubic vs ours vs ground truth](assets/comparison.png)
 
