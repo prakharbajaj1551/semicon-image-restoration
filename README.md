@@ -202,6 +202,39 @@ Upload a degraded image (`.npy` or PNG) → side-by-side original/restored
 with PSNR and inference time. A second mode degrades a clean image live and
 restores it, showing the bicubic baseline vs. ours.
 
+## Failure cases and limitations
+
+[`results/failure_cases/`](results/failure_cases/) documents where the model
+performs worst, with images and a quantified explanation. In short: gain
+correlates **−0.653** with ground-truth detail — densely textured images
+gain least (+0.48 dB worst case), smooth images most (+15.26 dB best).
+Detail destroyed by 2× downsampling can only be guessed, and our
+fidelity-first design deliberately refuses to guess. The model still beats
+the bicubic baseline on **all 100** test images; there is no case where
+restoring is worse than doing nothing.
+
+## External resources and licences
+
+Every third-party model, dataset and library used, as required by the
+submission checklist.
+
+| Resource | Purpose | Licence | Reference |
+|---|---|---|---|
+| **KLA hackathon dataset** | Training and validation pairs (3,200 GT/NoisyLR) | Provided by KLA for SEMICON India Hackathon 2026 use; not redistributed in this repository | Official hackathon portal |
+| **LPIPS** (`lpips` v0.1, AlexNet backbone) | Perceptual term in the training loss (weight 0.05) and reported LPIPS metric | BSD-2-Clause | [github.com/richzhang/PerceptualSimilarity](https://github.com/richzhang/PerceptualSimilarity) · Zhang et al., *The Unreasonable Effectiveness of Deep Features as a Perceptual Metric*, CVPR 2018 |
+| ↳ **AlexNet ImageNet weights** | Backbone inside LPIPS, downloaded automatically by that package | BSD-3-Clause (torchvision) | Krizhevsky et al., 2012 · [pytorch.org/vision](https://pytorch.org/vision/stable/models.html) |
+| **pytorch-msssim** | Differentiable SSIM term in the training loss | MIT | [github.com/VainF/pytorch-msssim](https://github.com/VainF/pytorch-msssim) |
+| **scikit-image** | Reference SSIM used for *reporting* metrics | BSD-3-Clause | [scikit-image.org](https://scikit-image.org) |
+| **PyTorch / torchvision** | Framework | BSD-3-Clause | [pytorch.org](https://pytorch.org) |
+| **Streamlit** | Demo interface | Apache-2.0 | [streamlit.io](https://streamlit.io) |
+
+**No pretrained restoration weights were used.** The NAFNet-SR model in
+`models/nafnet.py` is implemented from the published architecture and
+trained from random initialisation on the provided dataset only. No
+external image datasets were used for training. The only pretrained
+weights anywhere in the project are AlexNet's, used inside LPIPS purely to
+*measure* perceptual similarity — never to generate output pixels.
+
 ## Future improvements
 
 - **Bigger model** (`--width 64 --blocks 32`): more capacity, ~2× slower.
