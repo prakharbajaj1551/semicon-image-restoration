@@ -1,22 +1,33 @@
 """Restore every image in a folder using a trained checkpoint.
 
-    python inference.py --ckpt checkpoints/best.pth --input data/test/lq --output outputs/restored
+    python inference.py --input data/test_submission --output outputs/submission
 
-No code editing needed: the checkpoint file stores the model's own
-configuration (width, blocks, scale), so the right network is rebuilt
-automatically no matter which experiment produced it.
+No code editing needed: the checkpoint stores the model's own configuration
+(width, blocks, scale), so the right network is rebuilt automatically no
+matter which experiment produced it.
 
-WHY images are processed in TILES (default 256x256):
-    A 2000x2000 input at 4x scale would need several GB of GPU memory in
-    one go. Instead we cut the input into overlapping tiles, restore each
-    tile, and stitch the results. Small images (<= one tile) skip this
-    entirely. The tiles OVERLAP because pixels at a tile's edge see less
-    context and restore slightly worse — overlapping lets every stitched
-    pixel come from a tile where it was comfortably inside.
+WHY BATCHING (this is a scored criterion):
+    Evaluators measure END-TO-END throughput: disk reading, preprocessing,
+    CPU-to-GPU transfer, model execution, GPU-to-CPU transfer, post-
+    processing and saving. Sending one image at a time leaves the GPU
+    mostly idle waiting for transfers. Stacking N images into one tensor
+    keeps it busy and cuts total time substantially.
+
+    Images can only be batched together if they have the SAME size, so we
+    group by shape first. Real test sets are usually one size, so this
+    normally produces a single group.
+
+WHY TILING is still here:
+    A very large image at 2x scale can exhaust GPU memory in one pass. Any
+    image bigger than --tile is cut into overlapping tiles, restored, and
+    stitched. Tiles overlap because pixels at a tile edge see less context;
+    overlapping means every stitched pixel comes from a tile where it sat
+    comfortably inside.
 """
 
 import argparse
 import time
+from collections import defaultdict
 from pathlib import Path
 
 import torch
@@ -27,15 +38,22 @@ from utils.image_io import list_images, load_image, save_image
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Restore a folder of degraded images")
+    parser.add_argument("--input", required=True, help="folder of degraded images")
+    parser.add_argument("--output", required=True, help="folder for restored images")
     parser.add_argument("--ckpt", default="checkpoints/best.pth",
                         help="trained checkpoint (best.pth)")
-    parser.add_argument("--input", required=True, help="folder of degraded images")
-    parser.add_argument("--output", default="outputs/restored",
-                        help="folder for restored images")
-    parser.add_argument("--tile", type=int, default=256,
-                        help="tile size for large images; 0 = whole image at once")
+    # Default adapts to the device: batching hides transfer latency on a GPU,
+    # but a CPU is already compute-bound and large batches only add memory
+    # pressure (measured: batch 1 beats batch 8 by ~17% on CPU).
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="images processed together "
+                             "(default: 8 on GPU, 1 on CPU); lower it if GPU memory runs out")
+    parser.add_argument("--tile", type=int, default=512,
+                        help="images larger than this are processed in tiles; 0 = never tile")
     parser.add_argument("--overlap", type=int, default=32,
                         help="how much neighbouring tiles overlap")
+    parser.add_argument("--amp", action="store_true",
+                        help="half-precision on GPU: faster, tiny numerical difference")
     return parser.parse_args()
 
 
@@ -49,14 +67,32 @@ def load_model(ckpt_path, device):
 
 
 @torch.no_grad()   # inference only — no gradients means less memory, more speed
-def restore_image(model, degraded, scale, device, tile, overlap):
-    """Restore one (C,H,W) image, tiling it if it is larger than `tile`."""
+def restore_batch(model, batch, device, use_amp=False):
+    """Restore a stack of same-sized images: (N,C,H,W) in -> (N,C,sH,sW) out."""
+    batch = batch.to(device, non_blocking=True)
+    if use_amp and device.type == "cuda":
+        with torch.autocast("cuda", dtype=torch.float16):
+            restored = model(batch)
+        restored = restored.float()
+    else:
+        restored = model(batch)
+    # Clip inside our own pipeline: KLA scores exactly what we save, and
+    # ground truth lives in [0,1], so values outside it can only be wrong.
+    return restored.clamp(0, 1).cpu()
+
+
+@torch.no_grad()
+def restore_image(model, degraded, scale, device, tile=512, overlap=32, use_amp=False):
+    """Restore ONE (C,H,W) image, tiling it if it is larger than `tile`.
+
+    Kept as a separate function because the Streamlit app restores single
+    uploaded images, and because very large images must avoid batching.
+    """
     channels, height, width = degraded.shape
 
-    # Small image: one pass, no tiling needed.
+    # Small enough: one pass, no tiling needed.
     if tile <= 0 or (height <= tile and width <= tile):
-        restored = model(degraded.unsqueeze(0).to(device))  # add batch dim
-        return restored.squeeze(0).clamp(0, 1).cpu()
+        return restore_batch(model, degraded.unsqueeze(0), device, use_amp).squeeze(0)
 
     # Large image: restore overlapping tiles and paste them into a canvas.
     canvas = torch.zeros(channels, height * scale, width * scale)
@@ -74,11 +110,10 @@ def restore_image(model, degraded, scale, device, tile, overlap):
     for top in row_starts:
         for left in col_starts:
             patch = degraded[:, top:top + tile, left:left + tile]
-            restored = model(patch.unsqueeze(0).to(device))
-            restored = restored.squeeze(0).clamp(0, 1).cpu()
-            # Paste at the scaled-up position. Later tiles overwrite the
-            # overlap zone — those pixels sit deeper inside the later tile,
-            # so the overwrite is the better-restored version.
+            restored = restore_batch(model, patch.unsqueeze(0), device,
+                                     use_amp).squeeze(0)
+            # Later tiles overwrite the overlap zone — those pixels sit
+            # deeper inside the later tile, so they are the better version.
             canvas[:, top * scale:(top + tile) * scale,
                    left * scale:(left + tile) * scale] = restored
     return canvas
@@ -88,36 +123,72 @@ def main():
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    if args.batch_size is None:
+        args.batch_size = 8 if device.type == "cuda" else 1
+
     model, config = load_model(args.ckpt, device)
-    print(f"model loaded from {args.ckpt} "
-          f"(scale x{config['scale']}, width {config['width']}, "
-          f"{config['n_blocks']} blocks) on {device}")
+    scale = config["scale"]
+    print(f"model: NAFNet-SR x{scale}, width {config['width']}, "
+          f"{config['n_blocks']} blocks | device: {device.type} | "
+          f"batch size: {args.batch_size} | amp: {args.amp}")
 
     out_dir = Path(args.output)
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    total_time = 0.0
     image_paths = list_images(args.input)
+
+    # ---- END-TO-END TIMING starts here: disk read is part of the runtime ----
+    start_total = time.time()
+
+    # 1. READ every image and group by shape (only same-sized images batch).
+    start_read = time.time()
+    groups = defaultdict(list)
     for path in image_paths:
-        degraded = load_image(path, config["channels"])
+        image = load_image(path, config["channels"])
+        groups[tuple(image.shape)].append((path, image))
+    read_seconds = time.time() - start_read
 
-        start = time.time()
-        restored = restore_image(model, degraded, config["scale"],
-                                 device, args.tile, args.overlap)
-        seconds = time.time() - start
-        total_time += seconds
+    # 2. RESTORE, then 3. SAVE — timed separately so the report can show
+    #    where the time actually goes.
+    compute_seconds = 0.0
+    save_seconds = 0.0
 
-        # Keep the input's format: .npy stays .npy (float precision, the
-        # organisers' submission format), images become PNG (lossless —
-        # JPEG would add its own artifacts to our restored pixels).
-        extension = ".npy" if path.suffix.lower() == ".npy" else ".png"
-        save_image(restored, out_dir / f"{path.stem}{extension}")
-        print(f"{path.name}  {tuple(degraded.shape[-2:])} -> "
-              f"{tuple(restored.shape[-2:])}  in {seconds:.2f}s")
+    for shape, items in groups.items():
+        too_big = args.tile > 0 and (shape[-2] > args.tile or shape[-1] > args.tile)
 
-    average = total_time / max(1, len(image_paths))
-    print(f"done: {len(image_paths)} images in {total_time:.1f}s "
-          f"(average {average:.2f}s per image) -> {out_dir}")
+        for start in range(0, len(items), args.batch_size):
+            chunk = items[start:start + args.batch_size]
+
+            t0 = time.time()
+            if too_big:
+                # Oversized images: one at a time, through the tiling path.
+                results = [restore_image(model, img, scale, device, args.tile,
+                                         args.overlap, args.amp)
+                           for _, img in chunk]
+            else:
+                batch = torch.stack([img for _, img in chunk])
+                results = list(restore_batch(model, batch, device, args.amp))
+            if device.type == "cuda":
+                torch.cuda.synchronize()   # GPU work is async; wait before timing
+            compute_seconds += time.time() - t0
+
+            t0 = time.time()
+            for (path, _), restored in zip(chunk, results):
+                # Keep the input's format: .npy stays .npy (the organisers'
+                # format), images become PNG (lossless).
+                suffix = ".npy" if path.suffix.lower() == ".npy" else ".png"
+                save_image(restored, out_dir / f"{path.stem}{suffix}")
+            save_seconds += time.time() - t0
+
+    total_seconds = time.time() - start_total
+    count = len(image_paths)
+
+    print(f"\nrestored {count} images -> {out_dir}")
+    print(f"  read + preprocess : {read_seconds:6.2f} s")
+    print(f"  model + transfers : {compute_seconds:6.2f} s")
+    print(f"  post + save       : {save_seconds:6.2f} s")
+    print(f"  END-TO-END TOTAL  : {total_seconds:6.2f} s "
+          f"({total_seconds / max(1, count) * 1000:.1f} ms per image, "
+          f"{count / max(1e-9, total_seconds):.1f} images/second)")
 
 
 if __name__ == "__main__":
