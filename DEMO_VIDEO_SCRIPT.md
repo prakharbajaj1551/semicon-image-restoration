@@ -87,9 +87,10 @@ whole screen, so you can move freely between the PDF and the app.
 > *First, supervised learning on the 3,200 paired images KLA provided — no
 > external datasets, and no pretrained restoration weights.*
 >
-> *Second, a single network does both jobs — denoising and two-times
-> super-resolution in one forward pass. Doing them jointly beats chaining two
-> separate models.*
+> *Second, a single network performs denoising and two-times
+> super-resolution jointly, rather than chaining two separate models. One
+> pass means one set of weights to train and no intermediate image where
+> errors from the first stage could be amplified by the second.*
 >
 > *Third, and most important: our model corrects, rather than generates.*
 
@@ -115,8 +116,8 @@ whole screen, so you can move freely between the PDF and the app.
 > inspection that matters, because an invented edge could be read as a defect,
 > or could mask a real one.*
 >
-> *The whole model is only zero point five three million parameters — six and
-> a half megabytes.*
+> *The network has only zero point five three million parameters — about two
+> point three megabytes as a saved inference checkpoint.*
 
 ### SECTION 3 — Live demonstration (2:05 – 3:20) ← the most important part
 
@@ -124,7 +125,8 @@ whole screen, so you can move freely between the PDF and the app.
 
 > *This is our demo application running the trained model. The sidebar shows
 > what it loaded: NAFNet-SR, two-times scale, forty-eight channels,
-> twenty-four blocks — and note it is running on CPU. No GPU required.*
+> twenty-four blocks. For this live demo we are running entirely on CPU — no
+> GPU at all. I will come back to our GPU benchmark in a moment.*
 
 **Select `000102.npy` from the dropdown**
 
@@ -149,9 +151,10 @@ whole screen, so you can move freely between the PDF and the app.
 
 **Point at the metrics**
 
-> *The app scores it automatically against the ground truth: thirty-two point
-> five nine decibels, restored in about a second — more than ten decibels
-> better than the bicubic baseline on this image.*
+> *The app scores it automatically: against its ground truth this image
+> reaches thirty-two point five nine decibels, restored in about a second on
+> CPU — ten and a half decibels better than the bicubic baseline, which gets
+> twenty-two point zero six.*
 
 **Select `000122.npy`**
 
@@ -164,14 +167,16 @@ whole screen, so you can move freely between the PDF and the app.
 
 **Show: Slide 6 (Impact and Benefits)** — the results strip and bar chart
 
-> *For an honest evaluation we held out one hundred image pairs, never used
-> in training or model selection, and scored all three judged metrics.*
+> *For an honest evaluation we held out one hundred image pairs from the
+> training data — never used in training or model selection — and scored all
+> three judged metrics against their ground truth. The organisers' own hidden
+> test set is separate; these are our own held-out pairs.*
 
 **Point at the bar chart on the right of the slide**
 
-> *PSNR: twenty-two point nine six decibels for bicubic, twenty-eight point
-> zero zero for ours — a gain of five point zero four decibels, which removes
-> roughly sixty-nine percent of the pixel error.*
+> *PSNR rises from twenty-two point nine six to twenty-eight point zero zero
+> decibels — a gain of five point zero four decibels, which corresponds to
+> about a sixty-nine percent reduction in mean squared error.*
 >
 > *SSIM, structural similarity: zero point five three seven, up to zero point
 > seven five nine.*
@@ -179,22 +184,23 @@ whole screen, so you can move freely between the PDF and the app.
 > *And LPIPS, the perceptual metric where lower is better: zero point four
 > three three, down to zero point one seven five — sixty percent lower.*
 >
-> *Better on every single judged metric.*
+> *Better on all three judged image-quality metrics.*
 >
-> *On speed — measured end to end, including reading from disk, transfers to
-> the GPU, the model itself and writing results — twenty-five milliseconds per
-> image on an NVIDIA T4, which is forty images per second. All four hundred
-> official test images restore in about ten seconds.*
+> *On speed: the live demo you just saw ran on CPU, but we also benchmarked on
+> GPU. Measured end to end — disk read, transfers, the model itself and
+> writing results — the same model reaches twenty-five milliseconds per image
+> on an NVIDIA T4, or forty images per second. At that rate the four hundred
+> official test images would take roughly ten seconds.*
 
 ### SECTION 5 — Honesty and close (4:10 – 4:30)
 
 **Show: Slide 5 (Innovation and Uniqueness)**
 
-> *We also published our failure cases. Our gain correlates negatively with
-> how much fine texture the ground truth already contains: when an image is
-> densely textured, detail destroyed by downsampling can only be guessed at,
-> and our design deliberately refuses to guess. Even in that worst case, we
-> still beat the baseline.*
+> *We also analysed our failure cases. Performance drops on images with very
+> dense fine texture, because information destroyed during downsampling
+> cannot be reliably recovered, and our residual design deliberately avoids
+> inventing that missing structure. Even in those difficult cases we still
+> outperform bicubic — on all one hundred held-out images.*
 
 **Show: Slide 8 (GitHub & Video Link)**
 
@@ -213,24 +219,43 @@ whole screen, so you can move freely between the PDF and the app.
 | Problem statement | PS01, KLA |
 | Input → output | 128×128 → 256×256 (2× scale) |
 | Training pairs | 3,200 provided → 3,000 train / 100 val / 100 test |
-| Model | NAFNet-SR, 0.53 M parameters, 6.5 MB |
+| Model | NAFNet-SR, 0.53 M parameters |
+| Checkpoint size | **2.3 MB** inference file (6.8 MB training file, which also stores optimizer state) |
 | Blocks / channels | 24 NAFNet blocks, 48 channels |
 | Training | 100 epochs, ~2 hours, free Colab T4 |
 | Loss | Charbonnier + 0.15 SSIM + 0.05 LPIPS |
+| Evaluated on | **our own 100 held-out pairs** (not the organisers' hidden set) |
 | **PSNR** | **28.00 dB** (bicubic 22.96) |
 | **SSIM** | **0.759** (bicubic 0.537) |
 | **LPIPS** | **0.175** (bicubic 0.433 — lower is better) |
-| Gain | +5.04 dB, ≈69% of pixel error removed |
-| Speed | 25 ms/image, 40 img/s on T4, end-to-end |
-| All 400 test images | ~10 seconds |
+| Gain | +5.04 dB ≈ **69% reduction in MSE** |
+| Speed — live demo | CPU, ~1.2 s/image |
+| Speed — benchmark | **25 ms/image, 40 img/s on an NVIDIA T4**, end-to-end |
+| 400 official test images | ~10 s at that rate (**extrapolated**, not measured on 400) |
 | Demo image 000102 | ours 32.59 dB vs bicubic 22.06 dB |
 | Demo image 000122 | ours 30.49 dB vs bicubic 23.68 dB |
 | Win rate | 100 of 100 held-out images beat bicubic |
 
-**Careful with wording:** say hallucination is *strongly constrained* by the
-residual design — not "impossible". The skip anchors the output to the real
-input, but a network can still be wrong, and a technical judge will notice an
-absolute claim.
+### Claims to state carefully
+
+These are the sentences a technical judge is most likely to probe.
+
+- **"Strongly constrained", not "impossible."** The residual skip anchors the
+  output to the real input; it does not make hallucination mathematically
+  impossible.
+- **100 vs 400.** Our metrics come from *our own* 100 held-out pairs. The 400
+  figure is the organisers' test set, and the ~10 s is an extrapolation from
+  the measured 25 ms/image — say "would take", not "takes".
+- **CPU vs GPU.** The live demo runs on CPU (~1.2 s/image); the 25 ms figure
+  is the T4 benchmark. Always name which one you mean.
+- **2.3 MB, not 6.5 MB.** 0.53 M float32 parameters is 2.1 MB of weights; the
+  inference checkpoint is 2.3 MB. The 6.8 MB training file also carries AdamW
+  optimizer state, which inference never uses.
+- **MSE, not "pixel error".** +5.04 dB corresponds to a ~69% reduction in mean
+  squared error (10^(−5.04/10) ≈ 0.31).
+- **No joint-vs-chained ablation.** We did not run that experiment, so do not
+  claim joint training "beats" a two-stage pipeline — say what it avoids
+  instead.
 
 ---
 
