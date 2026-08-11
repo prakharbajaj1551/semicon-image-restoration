@@ -50,7 +50,7 @@ Tail conv → **add bicubic upscale of input** → Output 256×256
 > Twenty-four blocks clean the features, PixelShuffle learns the upscale,
 > and the key trick is the global skip: we add a plain bicubic upscale of
 > the input, so the network only predicts the correction. That makes
-> training stable and hallucination structurally impossible."
+> training stable and strongly constrains hallucination."
 
 ## Slide 5 — Innovation
 - **Simplicity as strategy**: SOTA-family quality at 0.53 M params — we can

@@ -76,7 +76,8 @@ Design decisions, each chosen for **simplicity + proven results**:
   block simple enough to draw on a whiteboard — LayerNorm → conv →
   SimpleGate → channel attention. No transformers, not even ReLU.
 - **Global bicubic skip**: the network only learns the *correction* on top of
-  a plain upscale. It recovers structure — it cannot invent it. For defect
+  a plain upscale, which anchors the output to the real input and strongly
+  constrains hallucination rather than leaving the network free to generate. For defect
   inspection, never hallucinating is a hard requirement, not a preference.
 - **Loss = Charbonnier + 0.15·SSIM + 0.05·LPIPS**: pixel fidelity in charge,
   structural and perceptual terms directly optimising the judged metrics.
