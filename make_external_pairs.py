@@ -29,8 +29,8 @@ import numpy as np
 import torch
 from PIL import Image
 
-from dataset.degradation import DegradationSettings, degrade_image
-from utils.image_io import save_image
+from src.dataset.degradation import DegradationSettings, degrade_image
+from src.utils.image_io import save_image
 
 # Pillow can open these; .npy is excluded on purpose (external sets are photos)
 PHOTO_TYPES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
@@ -121,7 +121,7 @@ def main():
     print(f"  python train.py --mode paired \\\n"
           f"      --train-lq {out}/lq --train-gt {out}/gt \\\n"
           f"      --val-lq data/val/lq --val-gt data/val/gt \\\n"
-          f"      --scale {args.scale} --epochs 60 --resume checkpoints/best.pth")
+          f"      --scale {args.scale} --epochs 60 --resume weights/model.pth")
 
 
 if __name__ == "__main__":

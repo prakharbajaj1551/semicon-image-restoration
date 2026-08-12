@@ -27,7 +27,7 @@ from pathlib import Path
 import torch
 
 from inference import load_model, restore_batch
-from utils.image_io import list_images, load_image, save_image
+from src.utils.image_io import list_images, load_image, save_image
 
 
 def environment_report(device):
@@ -78,7 +78,7 @@ def run_once(model, config, paths, device, batch_size, out_dir):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", default="data/test/lq")
-    parser.add_argument("--ckpt", default="checkpoints/best.pth")
+    parser.add_argument("--ckpt", default="weights/model.pth")
     parser.add_argument("--batch-sizes", type=int, nargs="+", default=[1, 4, 8, 16])
     parser.add_argument("--out", default="results/runtime_report.md")
     args = parser.parse_args()

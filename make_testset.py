@@ -33,8 +33,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from dataset.degradation import DegradationSettings, degrade_image
-from utils.image_io import list_images, load_image, save_image
+from src.dataset.degradation import DegradationSettings, degrade_image
+from src.utils.image_io import list_images, load_image, save_image
 
 
 def parse_args():

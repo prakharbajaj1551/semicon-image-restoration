@@ -1,0 +1,67 @@
+# Configuration that produced the submitted checkpoint (weights/model.pth).
+#
+# This file documents the run rather than driving it: train.py takes command
+# line flags, and every value below is the flag it was given. Keeping them
+# here means the experiment can be reproduced exactly without reading the
+# shell history, which is what "reproducible training" asks for.
+
+experiment: nafnet_sr_x2
+date: 2026-08-07
+
+model:
+  architecture: NAFNet-SR      # src/models/nafnet.py
+  channels: 1                  # grayscale; KLA's data is single-channel
+  width: 48                    # feature channels in the trunk
+  n_blocks: 24                 # NAFNet blocks in the body
+  scale: 2                     # 128x128 -> 256x256
+  parameters: 530000           # 0.53 M
+  upsampler: pixelshuffle
+  global_skip: bicubic         # network predicts a residual correction
+
+data:
+  source: KLA paired dataset (GT + NoisyLR, float32 .npy)
+  total_pairs: 3200
+  split: {train: 3000, val: 100, test: 100}
+  split_seed: 42               # reproducible on any machine
+  patch_size: 128              # random crop on the ground truth
+  augmentation: flips + 90 degree rotations (8x), applied identically to
+    input and target
+  input_clipping: none         # NoisyLR legitimately exceeds [0,1]
+
+loss:
+  charbonnier: 1.0             # robust pixel fidelity
+  ssim: 0.15                   # structural similarity
+  lpips: 0.05                  # perceptual, kept small on purpose
+
+training:
+  optimizer: AdamW
+  lr: 0.0002
+  betas: [0.9, 0.9]
+  weight_decay: 0.0001
+  scheduler: cosine annealing to 1e-7
+  epochs: 100
+  batch_size: 16
+  grad_clip: 1.0
+  seed: 42
+  hardware: NVIDIA T4 (Google Colab, free tier)
+  wall_clock: ~2 hours (74 s/epoch)
+  checkpoint_selection: best validation PSNR (epoch 85)
+
+results:                       # on the 100 held-out pairs, see results/
+  psnr: 28.00                  # bicubic baseline 22.96
+  ssim: 0.759                  # bicubic baseline 0.537
+  lpips: 0.175                 # bicubic baseline 0.433 (lower is better)
+  val_psnr_best: 27.334
+
+inference:
+  checkpoint: weights/model.pth    # 2.3 MB, weights + config only
+  batch_size: 8 on CUDA, 1 on CPU  # measured: batching costs ~17% on CPU
+  tile: 512                        # larger images processed in tiles
+  output_clipping: [0, 1]          # applied by us; KLA does not renormalise
+  throughput: 25 ms/image, 40 img/s end-to-end on a T4
+
+# Reproduce with:
+#   python train.py --mode paired \
+#       --train-lq data/train/lq --train-gt data/train/gt \
+#       --val-lq data/val/lq --val-gt data/val/gt \
+#       --scale 2 --patch 128 --epochs 100 --batch-size 16 --out weights

@@ -32,15 +32,15 @@ from pathlib import Path
 
 import torch
 
-from models.nafnet import NAFNetSR
-from utils.image_io import list_images, load_image, save_image
+from src.models.nafnet import NAFNetSR
+from src.utils.image_io import list_images, load_image, save_image
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Restore a folder of degraded images")
     parser.add_argument("--input", required=True, help="folder of degraded images")
     parser.add_argument("--output", required=True, help="folder for restored images")
-    parser.add_argument("--ckpt", default="checkpoints/best.pth",
+    parser.add_argument("--ckpt", default="weights/model.pth",
                         help="trained checkpoint (best.pth)")
     # Default adapts to the device: batching hides transfer latency on a GPU,
     # but a CPU is already compute-bound and large batches only add memory

@@ -20,9 +20,9 @@ import torch
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ckpt", default="checkpoints/best.pth",
-                        help="full training checkpoint")
-    parser.add_argument("--out", default="checkpoints/model.pth",
+    parser.add_argument("--ckpt", default="weights/best.pth",
+                        help="full training checkpoint (weights + optimizer)")
+    parser.add_argument("--out", default="weights/model.pth",
                         help="slim inference checkpoint to write")
     args = parser.parse_args()
 

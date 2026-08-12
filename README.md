@@ -3,7 +3,7 @@
 **Team BYTE BRIGADE** — SEMICON India Hackathon 2026
 Prakhar Bajaj · Raghav Soni · Parth Kumar · Mayank Lodhi
 
-A single lightweight neural network (0.53 M parameters, 6.8 MB) that takes a
+A single lightweight neural network (0.53 M parameters, 2.3 MB checkpoint) that takes a
 noisy 128×128 inspection image and outputs a clean, sharp 256×256 image —
 joint **denoising + 2× super-resolution** in one forward pass.
 
@@ -18,8 +18,8 @@ Measured on 100 held-out image pairs never seen during training:
 | Bicubic upscaling (no AI) | 22.96 dB | 0.537 | 0.433 |
 | **Ours (NAFNet-SR)** | **28.00 dB** | **0.759** | **0.175** |
 
-**+5.0 dB PSNR** (≈ 69 % of pixel error removed), **+0.22 SSIM**, and
-**LPIPS reduced by 60 %** — better on every judged metric.
+**+5.04 dB PSNR** (≈ 69 % reduction in MSE), **+0.22 SSIM**, and
+**LPIPS reduced by 60 %** — better on all three judged image-quality metrics.
 
 ### Speed (end-to-end, measured)
 
@@ -90,29 +90,49 @@ Design decisions, each chosen for **simplicity + proven results**:
 ## Folder structure
 
 ```
-├── dataset/
-│   ├── degradation.py    synthetic corruption pipeline (for augmentation/demo)
-│   └── loader.py         paired + synthetic PyTorch Datasets
-├── models/
-│   └── nafnet.py         NAFNet-SR architecture
-├── utils/
-│   ├── image_io.py       .npy / image loading & saving (one shared place)
-│   ├── losses.py         Charbonnier + SSIM + light LPIPS
-│   └── metrics.py        PSNR / SSIM / LPIPS
-├── data/                 datasets (not in git)
-│   ├── train/lq|gt       3000 training pairs
-│   ├── val/lq|gt         100 validation pairs
-│   ├── test/lq|gt        100 held-out benchmark pairs (+ bicubic/ baseline)
-│   └── test_submission/  400 official test inputs
-├── checkpoints/          best.pth — the trained model (config stored inside)
-├── outputs/              restored images, metrics CSVs, submission files
-├── app.py                Streamlit demo UI
-├── train.py              training loop
-├── evaluate.py           folder-vs-folder PSNR/SSIM/LPIPS report
-├── inference.py          batch restoration (the submission generator)
-├── make_testset.py       benchmark / bicubic-baseline builder
-└── requirements.txt
+├── README.md                     this file
+├── requirements.txt              pinned dependencies
+├── train.py                      training loop (reproduces weights/)
+├── inference.py                  standalone: --input DIR --output DIR
+├── evaluate.py                   PSNR / SSIM / LPIPS between two folders
+├── benchmark.py                  end-to-end runtime report
+├── export_model.py               training checkpoint -> slim inference file
+├── make_testset.py               bicubic-baseline / benchmark builder
+├── make_demo_data.py             synthetic data so the repo runs without the dataset
+├── make_external_pairs.py        external images -> KLA-format pairs (OOD training)
+├── app.py                        Streamlit demo UI
+├── configs/
+│   └── nafnet_sr_x2.yaml         exact configuration behind the submitted model
+├── src/
+│   ├── dataset/
+│   │   ├── degradation.py        degradation model, measured from KLA's pairs
+│   │   └── loader.py             paired + synthetic PyTorch Datasets
+│   ├── models/
+│   │   └── nafnet.py             NAFNet-SR architecture
+│   └── utils/
+│       ├── image_io.py           .npy / image loading and saving
+│       ├── losses.py             Charbonnier + SSIM + light LPIPS
+│       └── metrics.py            PSNR / SSIM / LPIPS
+├── weights/
+│   ├── model.pth                 2.3 MB inference checkpoint (submitted)
+│   └── best.pth                  6.8 MB training checkpoint (resumable)
+├── results/
+│   ├── runtime_report.md         hardware, timing method, throughput
+│   ├── metrics_*_100images.csv   per-image scores, ours and baseline
+│   ├── samples/                  restored examples at four stages
+│   └── failure_cases/            weakest results, with analysis
+├── assets/                       figures used in the README and deck
+├── data/                         datasets (not in git — see Dataset setup)
+│   ├── train/lq|gt               3000 training pairs
+│   ├── val/lq|gt                 100 validation pairs
+│   ├── test/lq|gt                100 held-out pairs (+ bicubic/ baseline)
+│   └── test_submission/          400 official test inputs
+└── outputs/                      restored images and submission files (not in git)
 ```
+
+The layout follows the structure recommended in the KLA problem statement
+(`configs/`, `src/`, `weights/`, `results/`, with `train.py` and
+`inference.py` at the root).
 
 Every file is written for readability: small modules, beginner-friendly
 naming, and comments that explain **why**, not just what.
@@ -136,7 +156,7 @@ the trained model run end to end, generate a synthetic demo set:
 
 ```bash
 python make_demo_data.py
-python inference.py --ckpt checkpoints/best.pth --input demo_data/lq --output outputs/demo
+python inference.py --ckpt weights/model.pth --input demo_data/lq --output outputs/demo
 python evaluate.py --restored outputs/demo --gt demo_data/gt
 ```
 
@@ -166,7 +186,7 @@ data/test/lq  + data/test/gt      data/test_submission/
 python train.py --mode paired \
     --train-lq data/train/lq --train-gt data/train/gt \
     --val-lq data/val/lq --val-gt data/val/gt \
-    --scale 2 --patch 128 --epochs 100 --batch-size 16 --out checkpoints
+    --scale 2 --patch 128 --epochs 100 --batch-size 16 --out weights
 ```
 
 ~2 h on a free Colab T4 (74 s/epoch). Resume an interrupted run with
@@ -185,7 +205,7 @@ Prints per-image and mean PSNR / SSIM / LPIPS and writes a CSV.
 ## Inference (submission generation)
 
 ```bash
-python inference.py --ckpt checkpoints/best.pth \
+python inference.py --ckpt weights/model.pth \
     --input data/test_submission --output outputs/submission
 ```
 

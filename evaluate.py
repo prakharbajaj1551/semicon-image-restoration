@@ -21,8 +21,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from utils.image_io import list_images, load_image
-from utils.metrics import LPIPSMetric, psnr, ssim
+from src.utils.image_io import list_images, load_image
+from src.utils.metrics import LPIPSMetric, psnr, ssim
 
 
 def parse_args():

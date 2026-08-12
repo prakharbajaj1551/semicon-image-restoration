@@ -1,4 +1,4 @@
-﻿"""Streamlit demo: upload an image -> restore it -> compare + metrics.
+"""Streamlit demo: upload an image -> restore it -> compare + metrics.
 
 Run with:
     streamlit run app.py
@@ -30,10 +30,10 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
-from dataset.degradation import DegradationSettings, degrade_image
+from src.dataset.degradation import DegradationSettings, degrade_image
 from inference import load_model, restore_image
-from utils.image_io import npy_to_tensor, pil_to_tensor
-from utils.metrics import psnr
+from src.utils.image_io import npy_to_tensor, pil_to_tensor
+from src.utils.metrics import psnr
 
 # The organisers' data comes as .npy arrays, so the app accepts those
 # too — judges can drop an actual test file straight into the demo.
@@ -46,7 +46,7 @@ def load_uploaded(uploaded_file):
         return npy_to_tensor(np.load(uploaded_file))
     return pil_to_tensor(Image.open(uploaded_file))
 
-CHECKPOINT = "checkpoints/best.pth"
+CHECKPOINT = "weights/model.pth"
 
 # initial_sidebar_state="expanded" so the mode switch is always visible —
 # with the default "auto" the sidebar can start collapsed and get missed.
@@ -148,7 +148,7 @@ if mode == "Restore a degraded image":
         # One-click demo: judges shouldn't watch us dig through folders.
         # Lists held-out test files; the matching ground truth is loaded
         # automatically so PSNR appears without a second upload.
-        from utils.image_io import list_images, load_image
+        from src.utils.image_io import list_images, load_image
         sample_names = [p.name for p in list_images("data/test/lq")[:20]]
         choice = st.selectbox("…or pick a sample from the held-out test set",
                               ["(choose a sample)"] + sample_names)

@@ -19,8 +19,8 @@ import argparse
 import numpy as np
 import torch
 
-from dataset.degradation import DegradationSettings, degrade_image
-from utils.image_io import save_image
+from src.dataset.degradation import DegradationSettings, degrade_image
+from src.utils.image_io import save_image
 
 
 def make_clean_image(index, size=256):
@@ -71,7 +71,7 @@ def main():
 
     print(f"\ndemo data written to {args.out}/ (lq/ and gt/)\n"
           f"try it:\n"
-          f"  python inference.py --ckpt checkpoints/best.pth "
+          f"  python inference.py --ckpt weights/model.pth "
           f"--input {args.out}/lq --output outputs/demo\n"
           f"  python evaluate.py --restored outputs/demo --gt {args.out}/gt\n"
           f"\nNOTE: these are SYNTHETIC smoke-test images, deliberately\n"

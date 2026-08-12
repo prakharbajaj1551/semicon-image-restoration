@@ -16,8 +16,13 @@ legacy/
 TEAM_CHECKLIST.md
 .claude/
 
-# Keep the trained model (small, 6.8 MB) — checkpoints/best.pth is committed.
-# Only ignore the rolling crash-recovery checkpoint:
-checkpoints/last.pth
+# weights/model.pth (2.3 MB, the submitted inference checkpoint) IS committed.
+# The training checkpoint carries 4.6 MB of AdamW optimizer state that
+# inference never reads, so it stays out of the repository:
+weights/best.pth
+weights/last.pth
 
 demo_data/
+
+# PowerPoint lock files
+~$*

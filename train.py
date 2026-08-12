@@ -7,7 +7,7 @@ Paired mode (organisers gave degraded+clean folders, matched filenames):
     python train.py --mode paired --train-lq data/train/lq --train-gt data/train/gt
                     --val-lq data/val/lq --val-gt data/val/gt --scale 4
 
-If training is interrupted, continue with:  --resume checkpoints/last.pth
+If training is interrupted, continue with:  --resume weights/last.pth
 
 HOW TRAINING WORKS (one "step", repeated thousands of times):
     1. FORWARD PASS   feed a batch of degraded patches through the model
@@ -33,11 +33,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from dataset.degradation import DegradationSettings
-from dataset.loader import PairedFolders, SyntheticPairs
-from models.nafnet import NAFNetSR, count_parameters
-from utils.losses import RestorationLoss
-from utils.metrics import psnr
+from src.dataset.degradation import DegradationSettings
+from src.dataset.loader import PairedFolders, SyntheticPairs
+from src.models.nafnet import NAFNetSR, count_parameters
+from src.utils.losses import RestorationLoss
+from src.utils.metrics import psnr
 
 
 def parse_args():
@@ -88,7 +88,7 @@ def parse_args():
                         help="fixes all randomness so runs are repeatable")
     parser.add_argument("--resume", default=None,
                         help="checkpoint path to continue an interrupted run")
-    parser.add_argument("--out", default="checkpoints",
+    parser.add_argument("--out", default="weights",
                         help="where best.pth / last.pth are saved")
     return parser.parse_args()
 
