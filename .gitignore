@@ -26,3 +26,6 @@ demo_data/
 
 # PowerPoint lock files
 ~$*
+
+# Recording aid, not a deliverable
+DEMO_VIDEO_SCRIPT.md
